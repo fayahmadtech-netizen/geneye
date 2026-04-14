@@ -56,7 +56,7 @@ def update_engineering_system(
     if not system or system.organization_id != current_user.organization_id:
         raise HTTPException(status_code=404, detail="System not found")
         
-    update_data = system_in.dict(exclude_unset=True)
+    update_data = system_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(system, field, value)
         

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -45,7 +46,7 @@ def create_chat_session(
     db_session = ChatSession(
         organization_id=current_user.organization_id,
         user_id=current_user.id,
-        **session_in.dict()
+        **session_in.model_dump()
     )
     session.add(db_session)
     session.commit()
@@ -113,7 +114,10 @@ def post_chat_message(
         content=mock_reply
     )
     session.add(ai_msg)
-    
+
+    chat_session.updated_at = datetime.utcnow()
+    session.add(chat_session)
+
     session.commit()
     
     # Return full message history

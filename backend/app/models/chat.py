@@ -15,7 +15,8 @@ class ChatSession(SQLModel, table=True):
     
     is_archived: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     messages: List["ChatMessage"] = Relationship(back_populates="session")
 
 class ChatMessage(SQLModel, table=True):
@@ -59,12 +60,13 @@ class ChatSessionRead(SQLModel):
     model_id: str
     is_archived: bool
     created_at: datetime
+    updated_at: datetime
     messages: List[ChatMessageRead] = []
 
 class ChatSessionCreate(SQLModel):
     title: Optional[str] = "New Conversation"
-    mode: str
-    model_id: str
+    mode: str = "internal"
+    model_id: str = "internal-default"
 
 class ChatMessageCreate(SQLModel):
     content: str

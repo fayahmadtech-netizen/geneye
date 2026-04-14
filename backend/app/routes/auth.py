@@ -82,11 +82,18 @@ def login(
         "token_type": "bearer",
     }
 
-@router.get("/me")
+@router.get("/me", response_model=UserPublic)
 def read_user_me(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Get current user.
+    Get current user (public fields only; never expose hashed_password).
     """
-    return current_user
+    return UserPublic(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        organization_id=current_user.organization_id,
+        role_id=current_user.role_id,
+        is_active=current_user.is_active,
+    )

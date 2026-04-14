@@ -1,16 +1,18 @@
-from typing import Any, List, Dict
+from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 from app.database.session import get_session
 from app.models.identity import User
 from app.models.maturity import (
-    MaturityDomain, 
-    MaturityDomainRead, 
-    MaturityAssessment, 
-    MaturityScore, 
-    AssessmentCreate, 
+    MaturityDomain,
+    MaturityDomainRead,
+    MaturityAssessment,
+    MaturityScore,
+    MaturityCriteria,
+    AssessmentCreate,
     MaturitySummary,
-    DomainScore
+    DomainScore,
 )
 from app.routes.deps import get_current_user
 
@@ -38,7 +40,8 @@ def get_assessment_structure(
     """
     Returns the hierarchy of domains and criteria for the user to fill out.
     """
-    domains = session.exec(select(MaturityDomain)).all()
+    statement = select(MaturityDomain).options(selectinload(MaturityDomain.criteria))
+    domains = session.exec(statement).all()
     return domains
 
 @router.post("/assessments", response_model=MaturitySummary)
@@ -109,7 +112,14 @@ def get_assessment_summary_logic(assessment_id: Any, session: Session) -> Maturi
     """
     Core logic to calculate weighted domain scores and overall maturity.
     """
-    assessment = session.get(MaturityAssessment, assessment_id)
+    statement = (
+        select(MaturityAssessment)
+        .where(MaturityAssessment.id == assessment_id)
+        .options(
+            selectinload(MaturityAssessment.scores).selectinload(MaturityScore.criteria)
+        )
+    )
+    assessment = session.exec(statement).first()
     if not assessment:
         raise HTTPException(status_code=404, detail="Assessment not found")
 

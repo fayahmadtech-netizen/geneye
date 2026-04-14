@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     # Database Settings
     DATABASE_URL: str
     
-    # CORS Settings
-    ALLOWED_CORS_ORIGIN: str = "http://localhost:3000"
+    # CORS Settings (comma-separated, e.g. "http://localhost:3000,http://127.0.0.1:3000")
+    ALLOWED_CORS_ORIGIN: str = "http://localhost:3000,http://127.0.0.1:3000"
     
     # Client App URL
     CLIENT_URL: str = "http://localhost:3000"

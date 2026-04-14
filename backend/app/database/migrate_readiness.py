@@ -112,3 +112,27 @@ def migrate_ato_diagnostics(engine: Engine) -> None:
         for col in ("completed_at", "recommendations"):
             if col in names_legacy:
                 run(f"ALTER TABLE {table} ALTER COLUMN {col} DROP NOT NULL")
+
+
+def migrate_chat_sessions(engine: Engine) -> None:
+    """Add updated_at to chat_sessions when DB predates the column (frontend lists by activity)."""
+    table = "chat_sessions"
+    if table not in inspect(engine).get_table_names():
+        return
+    names = _col_names(engine, table)
+    if "updated_at" in names:
+        return
+    dialect = engine.dialect.name
+    if dialect == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    f"ALTER TABLE {table} ADD COLUMN updated_at "
+                    "TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()"
+                )
+            )
+            conn.execute(text(f"UPDATE {table} SET updated_at = created_at WHERE updated_at IS NULL"))
+    elif dialect == "sqlite":
+        with engine.begin() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN updated_at TEXT"))
+            conn.execute(text(f"UPDATE {table} SET updated_at = created_at WHERE updated_at IS NULL"))

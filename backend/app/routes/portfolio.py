@@ -37,7 +37,7 @@ def create_use_case(
     """
     db_obj = UseCase(
         organization_id=current_user.organization_id,
-        **use_case_in.dict()
+        **use_case_in.model_dump()
     )
     session.add(db_obj)
     session.commit()

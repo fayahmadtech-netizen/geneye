@@ -18,6 +18,7 @@ def init_db():
     # This imports all models so they are registered on SQLModel.metadata
     from app import models
     SQLModel.metadata.create_all(engine)
-    from app.database.migrate_readiness import migrate_ato_diagnostics
+    from app.database.migrate_readiness import migrate_ato_diagnostics, migrate_chat_sessions
 
     migrate_ato_diagnostics(engine)
+    migrate_chat_sessions(engine)

@@ -57,4 +57,4 @@ def get_pipeline_runs(
     from app.models.mlops import PipelineRun
     statement = select(PipelineRun).where(PipelineRun.organization_id == current_user.organization_id)
     runs = session.exec(statement).all()
-    return {"runs": [run.dict() for run in runs]}
+    return {"runs": [run.model_dump(mode="json") for run in runs]}

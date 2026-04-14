@@ -1,7 +1,10 @@
 import axios from "axios";
 
 // Automatically use the public NEXT env var, fallback to localhost:8000 for backend
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+// Default to IPv4 loopback: on Windows, `localhost` can resolve to ::1 while another
+// process (e.g. Node) binds :8000 on IPv6, shadowing the FastAPI server on 127.0.0.1.
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_URL,

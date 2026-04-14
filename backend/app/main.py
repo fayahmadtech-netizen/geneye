@@ -9,10 +9,18 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# Set up CORS
+# Set up CORS (comma-separated origins in .env for localhost vs 127.0.0.1 dev)
+_cors_origins = [
+    o.strip()
+    for o in settings.ALLOWED_CORS_ORIGIN.split(",")
+    if o.strip()
+]
+if not _cors_origins:
+    _cors_origins = ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.ALLOWED_CORS_ORIGIN],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
