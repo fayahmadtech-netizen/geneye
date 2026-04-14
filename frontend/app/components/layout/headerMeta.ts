@@ -1,10 +1,13 @@
-/** Titles shown in the top bar; subtitle follows “AI Transformation Office · {unit}” pattern. */
-const DEFAULT_SUBTITLE = "AI Transformation Office · GF";
+/** Titles shown in the top bar (matches deployed Control Plane). */
+const DEFAULT_SUBTITLE = "AI Transformation Office - GF";
 
 export function getHeaderMeta(pathname: string): { title: string; subtitle: string } {
   const exact: Record<string, { title: string; subtitle?: string }> = {
     "/": { title: "AI Transformation Control Plane" },
-    "/readiness": { title: "AI Readiness Diagnostic" },
+    "/readiness": {
+      title: "AI Transformation Office",
+      subtitle: "Enterprise AI Readiness & Operating Model Diagnostic",
+    },
     "/blueprint": { title: "AI Org Blueprint" },
     "/portfolio": { title: "UseCaseX Portfolio" },
     "/portfolio/capital": { title: "Portfolio & Capital" },
@@ -26,6 +29,13 @@ export function getHeaderMeta(pathname: string): { title: string; subtitle: stri
   const hit = exact[pathname];
   if (hit) {
     return { title: hit.title, subtitle: hit.subtitle ?? DEFAULT_SUBTITLE };
+  }
+
+  if (pathname.startsWith("/readiness")) {
+    return {
+      title: "AI Transformation Office",
+      subtitle: "Enterprise AI Readiness & Operating Model Diagnostic",
+    };
   }
 
   if (pathname.startsWith("/chat")) {

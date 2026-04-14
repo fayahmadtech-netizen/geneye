@@ -4,16 +4,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  BookOpen,
+  Check,
   ChevronLeft,
   ClipboardList,
+  FileText,
   FolderOpen,
   Loader2,
-  Plus,
+  Target,
   X,
 } from "lucide-react";
 import { readinessService } from "../services/readinessService";
 import type { DiagnosticFull, ReadinessConfig } from "../types/readiness";
 import { getApiErrorMessage } from "../lib/apiError";
+import {
+  averageScore,
+  computeValueRisk,
+  defaultScores,
+  normalizeScores,
+  quadrantCategory,
+  timelineFromMaturity,
+  type ScoreKey,
+} from "./readinessLogic";
+import { ATO_ROADMAP_PHASES } from "./roadmapData";
+import { ExecutiveIntakeStep } from "./steps/ExecutiveIntakeStep";
+import { MaturityScoringStep } from "./steps/MaturityScoringStep";
+import { PrioritizationStep } from "./steps/PrioritizationStep";
+import { BlueprintStep } from "./steps/BlueprintStep";
+import { ExecutiveReviewStep } from "./steps/ExecutiveReviewStep";
 
 const TOTAL_STEPS = 5;
 
@@ -212,6 +230,20 @@ export function ReadinessDiagnosticClient() {
     flushPatch(diagnostic.id, { strategic_ai_goals: next });
   };
 
+  const patchScores = useCallback(
+    (newScores: Record<ScoreKey, number>) => {
+      if (!diagnostic) return;
+      const avg = averageScore(newScores);
+      setDiagnostic({
+        ...diagnostic,
+        scores: newScores as unknown as DiagnosticFull["scores"],
+        avg_score: avg,
+      });
+      queuePatch(diagnostic.id, { scores: newScores as Record<string, number>, avg_score: avg });
+    },
+    [diagnostic, queuePatch]
+  );
+
   const goNext = async () => {
     if (!diagnostic || !config) return;
     const step = diagnostic.current_step;
@@ -230,11 +262,95 @@ export function ReadinessDiagnosticClient() {
         return;
       }
       setError(null);
+      const tl = timelineFromMaturity(diagnostic.current_maturity);
+      const scores = normalizeScores(diagnostic.scores as Record<string, unknown>);
+      const avg = averageScore(scores);
+      const nextStep = 1;
+      setDiagnostic({
+        ...diagnostic,
+        current_step: nextStep,
+        timeline_label: tl.timeline_label,
+        timeline_months: tl.timeline_months,
+        avg_score: avg,
+      });
+      await flushPatch(diagnostic.id, {
+        current_step: nextStep,
+        timeline_label: tl.timeline_label,
+        timeline_months: tl.timeline_months,
+        avg_score: avg,
+      });
+      return;
     }
-    if (step >= TOTAL_STEPS - 1) return;
-    const nextStep = step + 1;
-    setDiagnostic({ ...diagnostic, current_step: nextStep });
-    await flushPatch(diagnostic.id, { current_step: nextStep });
+    if (step === 1) {
+      const scores = normalizeScores(diagnostic.scores as Record<string, unknown>);
+      const { valueScore, riskScore } = computeValueRisk(scores);
+      const cat = quadrantCategory(valueScore, riskScore);
+      const nextStep = 2;
+      const prio = { value_score: valueScore, risk_score: riskScore, quadrant: cat };
+      setDiagnostic({
+        ...diagnostic,
+        current_step: nextStep,
+        avg_score: averageScore(scores),
+        prioritization: prio as DiagnosticFull["prioritization"],
+      });
+      await flushPatch(diagnostic.id, {
+        current_step: nextStep,
+        avg_score: averageScore(scores),
+        prioritization: prio,
+      });
+      return;
+    }
+    if (step === 2) {
+      const nextStep = 3;
+      const blueprintDefault =
+        diagnostic.blueprint && diagnostic.blueprint.length > 0
+          ? null
+          : ATO_ROADMAP_PHASES.map((p) => ({
+              week_range: p.weekRange,
+              engine: p.engine,
+              title: p.title,
+              deliverable_count: p.deliverableCount,
+            }));
+      const nextBlueprint = blueprintDefault ?? diagnostic.blueprint;
+      setDiagnostic({
+        ...diagnostic,
+        current_step: nextStep,
+        ...(blueprintDefault ? { blueprint: nextBlueprint as DiagnosticFull["blueprint"] } : {}),
+      });
+      await flushPatch(diagnostic.id, {
+        current_step: nextStep,
+        ...(blueprintDefault ? { blueprint: blueprintDefault } : {}),
+      });
+      return;
+    }
+    if (step === 3) {
+      const nextStep = 4;
+      setDiagnostic({ ...diagnostic, current_step: nextStep });
+      await flushPatch(diagnostic.id, { current_step: nextStep });
+      return;
+    }
+  };
+
+  const startOver = async () => {
+    if (!diagnostic) return;
+    if (!confirm("Reset this diagnostic to step 1? Intake fields are kept; scores and roadmap data reset.")) return;
+    const empty = defaultScores();
+    const next = {
+      ...diagnostic,
+      current_step: 0,
+      scores: empty as unknown as DiagnosticFull["scores"],
+      prioritization: {} as DiagnosticFull["prioritization"],
+      blueprint: [] as DiagnosticFull["blueprint"],
+      avg_score: 0,
+    };
+    setDiagnostic(next);
+    await flushPatch(diagnostic.id, {
+      current_step: 0,
+      scores: empty,
+      prioritization: {},
+      blueprint: [],
+      avg_score: 0,
+    });
   };
 
   const goBack = async () => {
@@ -243,6 +359,11 @@ export function ReadinessDiagnosticClient() {
     const prev = diagnostic.current_step - 1;
     setDiagnostic({ ...diagnostic, current_step: prev });
     await flushPatch(diagnostic.id, { current_step: prev });
+  };
+
+  const saveReview = async () => {
+    if (!diagnostic) return;
+    await flushPatch(diagnostic.id, { company_name: diagnostic.company_name });
   };
 
   if (loading && !diagnostic) {

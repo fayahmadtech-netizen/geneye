@@ -13,6 +13,7 @@ import {
 } from "recharts";
 
 import { DomainScore } from "../../types/dashboard";
+import { mapMaturityToSixAxisRadar } from "../../lib/dashboardDerived";
 
 interface Props {
   domainScores: DomainScore[];
@@ -34,10 +35,11 @@ export function ReadinessRadarPanel({ domainScores }: Props) {
   const axisColor = isDark ? "#4B5563" : "#D1D5DB";
   const textColor = isDark ? "#9CA3AF" : "#6B7280";
 
-  const data = domainScores.map((ds) => ({
+  const sixAxis = mapMaturityToSixAxisRadar(domainScores);
+  const data = sixAxis.map((row) => ({
     subject:
-      ds.label.length > 18 ? `${ds.label.slice(0, 16)}…` : ds.label,
-    A: ds.score,
+      row.subject.length > 22 ? `${row.subject.slice(0, 20)}…` : row.subject,
+    A: row.A,
     fullMark: 5,
   }));
 
@@ -46,7 +48,7 @@ export function ReadinessRadarPanel({ domainScores }: Props) {
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Readiness Profile</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Enterprise readiness across strategic dimensions — from AI Diagnostic.
+          Enterprise readiness across 6 strategic dimensions — from AI Diagnostic.
         </p>
       </div>
       <div className="min-h-[320px] w-full flex-1">

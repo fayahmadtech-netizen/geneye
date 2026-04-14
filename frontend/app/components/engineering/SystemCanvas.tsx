@@ -15,6 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useTheme } from "next-themes";
 import { engineeringService } from "../../services/engineeringService";
+import type { EngineeringSystem } from "../../types/engineering";
 
 interface Props {
   systemId: string;
@@ -39,8 +40,8 @@ export function SystemCanvas({ systemId, initialNodes, initialEdges }: Props) {
     async () => {
       try {
         await engineeringService.updateSystem(systemId, {
-          nodes,
-          edges
+          nodes: nodes as unknown as EngineeringSystem["nodes"],
+          edges: edges as unknown as EngineeringSystem["edges"],
         });
       } catch (err) {
         console.error("Failed to save ADLC system layout:", err);

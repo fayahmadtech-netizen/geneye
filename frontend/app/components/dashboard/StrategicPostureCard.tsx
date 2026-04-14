@@ -1,3 +1,5 @@
+import { Target } from "lucide-react";
+
 interface StrategicPostureCardProps {
   category: string;
   avgValueScore: number;
@@ -13,7 +15,12 @@ export function StrategicPostureCard({
 }: StrategicPostureCardProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-white">Strategic Posture</h3>
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
+          <Target className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden />
+        </div>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Strategic Posture</h3>
+      </div>
       <dl className="mt-4 space-y-3 text-sm">
         <div className="flex justify-between gap-4 border-b border-gray-100 pb-3 dark:border-gray-800">
           <dt className="text-gray-500 dark:text-gray-400">Risk &amp; Value Category</dt>
@@ -26,16 +33,14 @@ export function StrategicPostureCard({
           </dd>
         </div>
         <div className="flex justify-between gap-4 border-b border-gray-100 pb-3 dark:border-gray-800">
-          <dt className="text-gray-500 dark:text-gray-400">High-Risk exposure</dt>
+          <dt className="text-gray-500 dark:text-gray-400">High-Risk (Tier 3)</dt>
           <dd className="text-right font-medium text-gray-900 dark:text-white">
-            {highRiskTier3Pct}% of initiatives (risk score ≥ 70)
+            {highRiskTier3Pct}% of portfolio
           </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-gray-500 dark:text-gray-400">Scale Conversion</dt>
-          <dd className="text-right font-medium text-gray-900 dark:text-white">
-            {scaleConversionPct}% in Production or Scaling
-          </dd>
+          <dd className="text-right font-medium text-gray-900 dark:text-white">{scaleConversionPct}%</dd>
         </div>
       </dl>
     </div>

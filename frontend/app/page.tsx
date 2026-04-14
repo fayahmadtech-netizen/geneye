@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Globe, Briefcase, Shield, DollarSign, Loader2 } from "lucide-react";
+import { Brain, Briefcase, Shield, DollarSign, Loader2 } from "lucide-react";
 import { dashboardService } from "./services/dashboardService";
 import { DashboardMetrics } from "./types/dashboard";
 import { DashboardKpiCard } from "./components/dashboard/DashboardKpiCard";
 import { ReadinessRadarPanel } from "./components/dashboard/ReadinessRadarPanel";
 import { StrategicPostureCard } from "./components/dashboard/StrategicPostureCard";
-import { GovernanceAlertsCard } from "./components/dashboard/GovernanceAlertsCard";
+import { CxoActionItemsCard } from "./components/dashboard/CxoActionItemsCard";
 import { ModuleIntelligence } from "./components/dashboard/ModuleIntelligence";
 import {
   deriveStrategicPosture,
   formatProjectedFromK,
   guardrailCoveragePct,
   pipelineCounts,
+  riskValueCategoryFromQuadrant,
   valueMultiplier,
 } from "./lib/dashboardDerived";
 
@@ -69,11 +70,19 @@ export default function Home() {
 
   const coveragePct = guardrailCoveragePct(gr);
   const govValue = coveragePct != null ? `${coveragePct}%` : "—";
-  const activeGr = gr.filter((g) => g.is_active).length;
+  const pendingApproval = alerts.length;
   const govSubtitle =
-    gr.length > 0
-      ? `${activeGr} active / ${gr.length} guardrails · ${alerts.length} open alert${alerts.length === 1 ? "" : "s"}`
-      : `${alerts.length} open alert${alerts.length === 1 ? "" : "s"}`;
+    pendingApproval === 1
+      ? "1 pending approval"
+      : `${pendingApproval} pending approval`;
+
+  const tier3ActiveCount = Math.max(
+    1,
+    metrics.useCases.filter((u) => u.risk_score >= 67).length
+  );
+
+  const riskValueCategory =
+    strategic?.category ?? riskValueCategoryFromQuadrant(p.quadrant_data);
 
   return (
     <div className="space-y-6">
@@ -82,18 +91,18 @@ export default function Home() {
           title="AI Readiness Index"
           value={`${m.overall_score.toFixed(1)} / 5`}
           subtitle={`Stage: ${m.level}`}
-          icon={Globe}
+          icon={Brain}
           accent="blue"
         />
         <DashboardKpiCard
           title="Portfolio Pipeline"
           value={`${p.total_active_use_cases} Initiatives`}
-          subtitle={`${scaled} production/scaling · ${pilot} pilot · ${idea} intake`}
+          subtitle={`${scaled} scaled · ${pilot} pilot · ${idea} idea`}
           icon={Briefcase}
           accent="emerald"
         />
         <DashboardKpiCard
-          title="Governance coverage"
+          title="Governance Coverage"
           value={govValue}
           subtitle={govSubtitle}
           icon={Shield}
@@ -126,11 +135,15 @@ export default function Home() {
               scores.
             </div>
           )}
-          <GovernanceAlertsCard alerts={alerts} />
+          <CxoActionItemsCard
+            guardrails={gr}
+            pendingApprovalCount={pendingApproval}
+            tier3ActiveCount={tier3ActiveCount}
+          />
         </div>
       </div>
 
-      <ModuleIntelligence metrics={metrics} />
+      <ModuleIntelligence metrics={metrics} riskValueCategory={riskValueCategory} />
     </div>
   );
 }

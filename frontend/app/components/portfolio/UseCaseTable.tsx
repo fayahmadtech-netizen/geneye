@@ -1,5 +1,5 @@
+import Link from "next/link";
 import { UseCase } from "../../types/portfolio";
-import { format } from "date-fns";
 import { MoreHorizontal } from "lucide-react";
 
 interface Props {
@@ -58,10 +58,17 @@ export function UseCaseTable({ useCases }: Props) {
               useCases.map((uc) => (
                 <tr key={uc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{uc.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-500 xl:w-64 truncate">
-                      {uc.description || "No description provided."}
-                    </div>
+                    <Link
+                      href={`/portfolio/${uc.id}`}
+                      className="group block text-left"
+                    >
+                      <div className="text-sm font-medium text-blue-600 group-hover:underline dark:text-blue-400">
+                        {uc.name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-500 xl:w-64 truncate">
+                        {uc.description || "No description provided."}
+                      </div>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                     {uc.domain}

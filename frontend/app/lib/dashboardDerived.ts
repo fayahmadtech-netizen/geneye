@@ -1,4 +1,34 @@
-import { PortfolioSummary, QuadrantPoint, UseCaseListItem } from "../types/dashboard";
+import { DomainScore, PortfolioSummary, QuadrantPoint, UseCaseListItem } from "../types/dashboard";
+
+/**
+ * Maps backend maturity domains (5 axes) to the six strategic radar dimensions
+ * shown on the AI Transformation Control Plane (Lovable reference).
+ */
+export function mapMaturityToSixAxisRadar(domainScores: DomainScore[]) {
+  const scoreById = Object.fromEntries(domainScores.map((d) => [d.domain_id, d.score]));
+  const pick = (id: string, fallback: number) =>
+    typeof scoreById[id] === "number" ? scoreById[id] : fallback;
+
+  const strategy = pick("strategy", 2.5);
+  const data = pick("data", 2.5);
+  const tech = pick("technology", 2.5);
+  const ops = pick("operations", 2.5);
+  const people = pick("people", 2.5);
+  const fallback =
+    domainScores.length > 0
+      ? domainScores.reduce((s, d) => s + d.score, 0) / domainScores.length
+      : 2.5;
+  const capital = Math.min(5, (strategy + ops) / 2 || fallback);
+
+  return [
+    { subject: "Org Model", A: strategy },
+    { subject: "Capital", A: capital },
+    { subject: "Adoption", A: people },
+    { subject: "Portfolio", A: ops },
+    { subject: "Governance", A: data },
+    { subject: "AI & Data Platform", A: tech },
+  ];
+}
 
 export function valueMultiplier(realizedK: number, projectedK: number) {
   if (realizedK <= 0) return null;
