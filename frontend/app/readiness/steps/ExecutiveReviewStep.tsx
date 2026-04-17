@@ -10,6 +10,8 @@ import {
 } from "../readinessLogic";
 import { scoreHeatClass } from "../readinessLogic";
 import { ATO_ROADMAP_PHASES, RECOMMENDED_NEXT_STEPS } from "../roadmapData";
+import { ReadinessExportMenu } from "../ReadinessExportMenu";
+import type { ReadinessExportFormat } from "../readinessExportBus";
 
 const iconMap = {
   shield: Shield,
@@ -21,10 +23,12 @@ const iconMap = {
 interface Props {
   diagnostic: DiagnosticFull;
   saving: boolean;
-  onSave: () => void;
+  exportDisabled?: boolean;
+  onSave: () => void | Promise<void>;
+  onExport: (format: ReadinessExportFormat) => void;
 }
 
-export function ExecutiveReviewStep({ diagnostic, saving, onSave }: Props) {
+export function ExecutiveReviewStep({ diagnostic, saving, exportDisabled, onSave, onExport }: Props) {
   const scores = normalizeScores(diagnostic.scores as Record<string, unknown>);
   const { valueScore, riskScore } = computeValueRisk(scores);
   const category = quadrantCategory(valueScore, riskScore);
@@ -43,7 +47,7 @@ export function ExecutiveReviewStep({ diagnostic, saving, onSave }: Props) {
             Board-ready snapshot with key insights &amp; roadmap.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onSave}
@@ -52,12 +56,7 @@ export function ExecutiveReviewStep({ diagnostic, saving, onSave }: Props) {
           >
             {saving ? "Saving…" : "Save"}
           </button>
-          <button
-            type="button"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            Export
-          </button>
+          <ReadinessExportMenu variant="card" disabled={exportDisabled} onChoose={onExport} />
         </div>
       </div>
 

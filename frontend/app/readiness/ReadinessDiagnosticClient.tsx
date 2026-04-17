@@ -27,6 +27,9 @@ import {
   type ScoreKey,
 } from "./readinessLogic";
 import { ATO_ROADMAP_PHASES } from "./roadmapData";
+import { downloadReadinessExport } from "./buildExportPayload";
+import { downloadReadinessExportExcel, downloadReadinessExportPdf } from "./exportReadinessFiles";
+import { registerReadinessExport, type ReadinessExportFormat } from "./readinessExportBus";
 import { ExecutiveIntakeStep } from "./steps/ExecutiveIntakeStep";
 import { MaturityScoringStep } from "./steps/MaturityScoringStep";
 import { PrioritizationStep } from "./steps/PrioritizationStep";
@@ -311,16 +314,20 @@ export function ReadinessDiagnosticClient() {
               title: p.title,
               deliverable_count: p.deliverableCount,
             }));
-      const nextBlueprint = blueprintDefault ?? diagnostic.blueprint;
-      setDiagnostic({
-        ...diagnostic,
-        current_step: nextStep,
-        ...(blueprintDefault ? { blueprint: nextBlueprint as DiagnosticFull["blueprint"] } : {}),
-      });
-      await flushPatch(diagnostic.id, {
-        current_step: nextStep,
-        ...(blueprintDefault ? { blueprint: blueprintDefault } : {}),
-      });
+      if (blueprintDefault) {
+        setDiagnostic({
+          ...diagnostic,
+          current_step: nextStep,
+          blueprint: blueprintDefault as DiagnosticFull["blueprint"],
+        });
+        await flushPatch(diagnostic.id, {
+          current_step: nextStep,
+          blueprint: blueprintDefault,
+        });
+      } else {
+        setDiagnostic({ ...diagnostic, current_step: nextStep });
+        await flushPatch(diagnostic.id, { current_step: nextStep });
+      }
       return;
     }
     if (step === 3) {
@@ -363,8 +370,60 @@ export function ReadinessDiagnosticClient() {
 
   const saveReview = async () => {
     if (!diagnostic) return;
-    await flushPatch(diagnostic.id, { company_name: diagnostic.company_name });
+    setError(null);
+    await flushPatch(diagnostic.id, {
+      company_name: diagnostic.company_name,
+      industry: diagnostic.industry ?? undefined,
+      num_bus: diagnostic.num_bus ?? undefined,
+      stakeholders: diagnostic.stakeholders,
+      strategic_ai_goals: diagnostic.strategic_ai_goals,
+      current_maturity: diagnostic.current_maturity ?? undefined,
+      ai_org_structure: diagnostic.ai_org_structure ?? undefined,
+      current_step: diagnostic.current_step,
+      scores: diagnostic.scores as Record<string, number>,
+      prioritization: diagnostic.prioritization as Record<string, unknown>,
+      blueprint: diagnostic.blueprint as Record<string, unknown>[],
+      timeline_label: diagnostic.timeline_label ?? undefined,
+      timeline_months: diagnostic.timeline_months ?? undefined,
+      avg_score: diagnostic.avg_score ?? undefined,
+    });
   };
+
+  const exportReview = (format: ReadinessExportFormat) => {
+    if (!diagnostic) return;
+    void (async () => {
+      setError(null);
+      try {
+        if (format === "pdf") await downloadReadinessExportPdf(diagnostic);
+        else if (format === "xlsx") await downloadReadinessExportExcel(diagnostic);
+        else downloadReadinessExport(diagnostic);
+      } catch (e) {
+        console.error(e);
+        setError("Could not export. Try again.");
+      }
+    })();
+  };
+
+  const diagnosticExportRef = useRef(diagnostic);
+  diagnosticExportRef.current = diagnostic;
+
+  useEffect(() => {
+    return registerReadinessExport((format) => {
+      const d = diagnosticExportRef.current;
+      if (!d) return;
+      void (async () => {
+        setError(null);
+        try {
+          if (format === "pdf") await downloadReadinessExportPdf(d);
+          else if (format === "xlsx") await downloadReadinessExportExcel(d);
+          else downloadReadinessExport(d);
+        } catch (e) {
+          console.error(e);
+          setError("Could not export. Try again.");
+        }
+      })();
+    });
+  }, []);
 
   if (loading && !diagnostic) {
     return (
@@ -389,13 +448,17 @@ export function ReadinessDiagnosticClient() {
   const step = diagnostic.current_step;
   const steps = config.steps;
 
+  const stepIcons = [ClipboardList, ClipboardList, Target, BookOpen, FileText] as const;
+
   return (
     <div className="relative mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Readiness Diagnostic</h1>
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+            AI Readiness Diagnostic
+          </p>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Enterprise AI readiness & operating model — data is saved to your organization via the API.
+            Progress auto-saves to your organization. Use the stepper to see where you are in the ATO journey.
           </p>
         </div>
         <button
@@ -420,191 +483,62 @@ export function ReadinessDiagnosticClient() {
         </div>
       )}
 
-      {/* Stepper */}
       <nav className="flex flex-wrap gap-2 border-b border-gray-200 pb-4 dark:border-gray-800">
         {steps.map((s, i) => {
           const active = i === step;
+          const done = i < step;
+          const StepIcon = stepIcons[i] ?? ClipboardList;
           return (
             <div
               key={s.key}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+              className={`flex min-w-[10rem] flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors sm:min-w-0 ${
                 active
-                  ? "bg-sky-50 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-950/50 dark:text-sky-200 dark:ring-sky-900"
-                  : "text-gray-500 dark:text-gray-400"
+                  ? "bg-blue-50 text-blue-900 ring-1 ring-blue-200 dark:bg-blue-950/40 dark:text-blue-100 dark:ring-blue-900"
+                  : done
+                    ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100"
+                    : "bg-gray-50 text-gray-500 dark:bg-gray-900/60 dark:text-gray-400"
               }`}
             >
-              <ClipboardList className="h-4 w-4 shrink-0" />
-              <span>{s.label}</span>
+              {done ? (
+                <Check className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
+              ) : (
+                <StepIcon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+              )}
+              <span className="leading-snug">{s.label}</span>
             </div>
           );
         })}
       </nav>
 
-      {/* Content card */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         {step === 0 && (
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Executive Intake</h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Core enterprise context &amp; strategic priorities.
-            </p>
-
-            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-              <div className="space-y-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Company information</p>
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Company Name <span className="text-red-500">*</span>
-                  </span>
-                  <input
-                    type="text"
-                    value={diagnostic.company_name}
-                    onChange={(e) => updateField("company_name", e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                    placeholder="Legal or brand name"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Industry <span className="text-red-500">*</span>
-                  </span>
-                  <select
-                    value={diagnostic.industry ?? ""}
-                    onChange={(e) => updateField("industry", e.target.value || null)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                  >
-                    <option value="">Select industry</option>
-                    {config.industries.map((ind) => (
-                      <option key={ind} value={ind}>
-                        {ind}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Number of Business Units</span>
-                  <input
-                    type="text"
-                    value={diagnostic.num_bus ?? ""}
-                    onChange={(e) => updateField("num_bus", e.target.value || null)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                    placeholder="e.g. 5"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Current AI Maturity Level <span className="text-red-500">*</span>
-                  </span>
-                  <select
-                    value={diagnostic.current_maturity ?? ""}
-                    onChange={(e) => updateField("current_maturity", e.target.value || null)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                  >
-                    <option value="">Select maturity level</option>
-                    {config.maturity_levels.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current AI Org Structure</span>
-                  <input
-                    type="text"
-                    value={diagnostic.ai_org_structure ?? ""}
-                    onChange={(e) => updateField("ai_org_structure", e.target.value || null)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                    placeholder="e.g. Centralized CoE, Federated, Hybrid"
-                  />
-                </label>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Stakeholder roles</p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">From API config — tap to toggle.</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {config.stakeholder_roles.map((role) => {
-                      const on = diagnostic.stakeholders.includes(role);
-                      return (
-                        <button
-                          key={role}
-                          type="button"
-                          onClick={() => toggleStakeholder(role)}
-                          className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                            on
-                              ? "border-sky-400 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-950/60 dark:text-sky-100"
-                              : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300"
-                          }`}
-                        >
-                          {role}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Strategic AI goals</p>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={goalInput}
-                      onChange={(e) => setGoalInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGoal())}
-                      className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                      placeholder="e.g. Reduce cycle time by 20%"
-                    />
-                    <button
-                      type="button"
-                      onClick={addGoal}
-                      className="inline-flex shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 p-2 text-gray-700 hover:bg-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                      aria-label="Add goal"
-                    >
-                      <Plus className="h-5 w-5" />
-                    </button>
-                  </div>
-                  {diagnostic.strategic_ai_goals.length > 0 && (
-                    <ul className="mt-3 flex flex-wrap gap-2">
-                      {diagnostic.strategic_ai_goals.map((g, idx) => (
-                        <li
-                          key={`${g}-${idx}`}
-                          className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-1 text-xs text-white dark:bg-gray-100 dark:text-gray-900"
-                        >
-                          <span>{g}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeGoal(idx)}
-                            className="rounded p-0.5 hover:bg-white/20"
-                            aria-label="Remove goal"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <ExecutiveIntakeStep
+            diagnostic={diagnostic}
+            config={config}
+            goalInput={goalInput}
+            setGoalInput={setGoalInput}
+            updateField={updateField}
+            toggleStakeholder={toggleStakeholder}
+            addGoal={addGoal}
+            removeGoal={removeGoal}
+          />
         )}
-
-        {step > 0 && (
-          <div className="py-12 text-center">
-            <p className="text-lg font-medium text-gray-900 dark:text-white">
-              Step {step + 1} — {steps[step]?.label ?? "Next"}
-            </p>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              This step will be wired to maturity scoring, prioritization, and blueprint APIs next. Your place in the
-              wizard is saved (current_step = {diagnostic.current_step}).
-            </p>
-          </div>
+        {step === 1 && (
+          <MaturityScoringStep diagnostic={diagnostic} onScoresChange={patchScores} />
+        )}
+        {step === 2 && <PrioritizationStep diagnostic={diagnostic} />}
+        {step === 3 && <BlueprintStep />}
+        {step === 4 && (
+          <ExecutiveReviewStep
+            diagnostic={diagnostic}
+            saving={saving}
+            onSave={saveReview}
+            onExport={exportReview}
+            exportDisabled={saving}
+          />
         )}
       </div>
 
-      {/* Footer */}
       <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-6 sm:flex-row dark:border-gray-800">
         <button
           type="button"
@@ -619,15 +553,24 @@ export function ReadinessDiagnosticClient() {
           Step {step + 1} of {TOTAL_STEPS}
           {saving && <span className="ml-2 text-blue-600 dark:text-blue-400">Saving…</span>}
         </p>
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={step >= TOTAL_STEPS - 1}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 disabled:opacity-40"
-        >
-          Next
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        {step >= TOTAL_STEPS - 1 ? (
+          <button
+            type="button"
+            onClick={startOver}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+          >
+            Start Over
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={goNext}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700"
+          >
+            Next
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Drawer */}

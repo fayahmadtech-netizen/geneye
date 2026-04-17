@@ -14,6 +14,8 @@ import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getHeaderMeta, initialsFromName } from "./headerMeta";
+import { triggerReadinessExport } from "../../readiness/readinessExportBus";
+import { ReadinessExportMenu } from "../../readiness/ReadinessExportMenu";
 
 export function Topbar() {
   const { user, logout } = useAuth();
@@ -66,13 +68,21 @@ export function Topbar() {
             <span className="whitespace-nowrap">FY 2025–2026</span>
           </button>
 
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            <Download className="h-4 w-4 text-gray-500" aria-hidden />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          {pathname.startsWith("/readiness") ? (
+            <ReadinessExportMenu
+              variant="topbar"
+              onChoose={(format) => triggerReadinessExport(format)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+              aria-label="Export"
+            >
+              <Download className="h-4 w-4 text-gray-500" aria-hidden />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          )}
 
           <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" aria-hidden />
 
